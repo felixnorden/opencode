@@ -1,26 +1,18 @@
 import { describe, test, expect } from "bun:test"
-import type { Permission } from "@/permission"
+import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import type { Agent } from "@/agent/agent"
 import { deriveSubagentSessionPermission } from "@/agent/subagent-permissions"
 
 describe("Subagent Permissions", () => {
   describe("deriveSubagentSessionPermission()", () => {
-    const parentSessionPermission: Permission.Ruleset = [
+    const parentSessionPermission: PermissionV1.Ruleset = [
       { permission: "external_directory", pattern: "*", action: "deny" },
       { permission: "external_directory", pattern: "/tmp/test", action: "allow" },
+      { permission: "edit", pattern: "*", action: "deny" },
+      { permission: "edit", pattern: ".opencode/plans/*", action: "allow" },
+      { permission: "todowrite", pattern: "*", action: "allow" },
+      { permission: "task", pattern: "*", action: "allow" },
     ]
-
-    const parent: Agent.Info = {
-      mode: "primary",
-      name: "parent",
-      options: {},
-      permission: [
-        { permission: "edit", pattern: "*", action: "deny" },
-        { permission: "edit", pattern: ".opencode/plans/*", action: "allow" },
-        { permission: "todowrite", pattern: "*", action: "allow" },
-        { permission: "task", pattern: "*", action: "allow" },
-      ],
-    }
 
     const subagent: Agent.Info = {
       mode: "subagent",
@@ -38,7 +30,6 @@ describe("Subagent Permissions", () => {
     test("skips overriding todowrite when subagent has permission", () => {
       const derivedPermission = deriveSubagentSessionPermission({
         parentSessionPermission,
-        parentAgent: parent,
         subagent,
       })
 
@@ -50,7 +41,6 @@ describe("Subagent Permissions", () => {
     test("skips overriding task when subagent has permission", () => {
       const derivedPermission = deriveSubagentSessionPermission({
         parentSessionPermission,
-        parentAgent: parent,
         subagent,
       })
 
@@ -63,7 +53,6 @@ describe("Subagent Permissions", () => {
       const permission = subagent.permission.filter((p) => p.permission !== "todowrite")
       const derivedPermission = deriveSubagentSessionPermission({
         parentSessionPermission,
-        parentAgent: parent,
         subagent: { ...subagent, permission },
       })
 
@@ -76,7 +65,6 @@ describe("Subagent Permissions", () => {
       const permission = subagent.permission.filter((p) => p.permission !== "task")
       const derivedPermission = deriveSubagentSessionPermission({
         parentSessionPermission,
-        parentAgent: parent,
         subagent: { ...subagent, permission },
       })
 
@@ -88,7 +76,6 @@ describe("Subagent Permissions", () => {
     test("skips overriding edit permission if subagent already matches parent permission", () => {
       const derivedPermission = deriveSubagentSessionPermission({
         parentSessionPermission,
-        parentAgent: parent,
         subagent,
       })
 
@@ -101,7 +88,6 @@ describe("Subagent Permissions", () => {
       const permission = subagent.permission.filter((p) => !(p.permission === "edit" && p.pattern === "*"))
       const derivedPermission = deriveSubagentSessionPermission({
         parentSessionPermission,
-        parentAgent: parent,
         subagent: { ...subagent, permission },
       })
 

@@ -1,4 +1,4 @@
-import { PermissionV1 } from "@opencode-ai/core/v1/permission"
+import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import type { Agent } from "./agent"
 import { HashSet, Result, pipe, Iterable, Array } from "effect"
 
@@ -24,19 +24,22 @@ import { HashSet, Result, pipe, Iterable, Array } from "effect"
 export function deriveSubagentSessionPermission(input: {
   parentSessionPermission: PermissionV1.Ruleset
   subagent: Agent.Info
-}): Permission.Ruleset {
-  const { parentSessionPermission, parentAgent, subagent } = input
+}): PermissionV1.Ruleset {
+  const { parentSessionPermission, subagent } = input
   const canTask = subagent.permission.some((rule) => rule.permission === "task")
   const canTodo = subagent.permission.some((rule) => rule.permission === "todowrite")
 
   const sessionPermission = parentSessionPermission.filter(
-    (rule) => rule.permission === "external_directory" || rule.action === "deny",
+    (rule) => rule.permission === "external_directory" || (rule.action === "deny" && rule.permission !== "edit"),
   )
 
-  const overridingParentPermissions = inheritParentPermissions(parentAgent?.permission ?? [], subagent.permission, {
+  const overridingParentPermissions = inheritParentPermissions(parentSessionPermission, subagent.permission, {
     permission: "edit",
     action: "deny",
   })
+
+  console.log({ overridingParentPermissions, sessionPermission })
+
   return [
     ...overridingParentPermissions,
     ...sessionPermission,
@@ -46,18 +49,20 @@ export function deriveSubagentSessionPermission(input: {
 }
 
 function inheritParentPermissions(
-  parent: Permission.Ruleset,
-  child: Permission.Ruleset,
-  opts: Omit<Permission.Rule, "pattern">,
-): Permission.Ruleset {
+  parent: PermissionV1.Ruleset,
+  child: PermissionV1.Ruleset,
+  opts: Omit<PermissionV1.Rule, "pattern">,
+): PermissionV1.Ruleset {
   const { permission, action } = opts
-  const f = (p: Permission.Rule) =>
+  const f = (p: PermissionV1.Rule) =>
     p.permission === permission && p.action === action ? Result.succeed(p.pattern) : Result.failVoid
 
   const parentPermissions = HashSet.fromIterable(Iterable.filterMap(parent, f))
   const childPermissions = HashSet.fromIterable(Iterable.filterMap(child, f))
 
   const diff = HashSet.difference(parentPermissions, childPermissions)
+
+  console.log({ parentPermissions, childPermissions, diff, child })
 
   return pipe(
     parent,
